@@ -22,5 +22,32 @@
       "X": 16,
       "Y": 24
     }
+  },
+  "channels": {
+    "lead": 0,
+    "layer": 1,
+    "split_bass": 2,
+    "drums": 9,
+    "sequencer_base": 10
+  },
+  "drum_map": {
+    "36": "Kick",
+    "38": "Snare",
+    "39": "Hand Clap",
+    "42": "Closed Hat",
+    "46": "Open Hat",
+    "49": "Crash",
+    "51": "Ride"
+  },
+  "effects": {
+    "reverb": {"roomsize": 0.6, "damping": 0.3, "width": 0.8, "level": 0.7},
+    "chorus": {"nr": 3, "level": 1.0, "speed": 0.3, "depth": 8.0}
+  },
+  "performance": {
+    "split_point": 60,
+    "split_bass_program": 33,
+    "layer_default_program": 89,
+    "layer_detune_cents": 7,
+    "layer_volume_offset": -0.15
   }
 }

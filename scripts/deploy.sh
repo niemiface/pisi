@@ -8,7 +8,8 @@ TARGET_DIR="~/pisi/"
 
 echo "Syncing local files to ${TARGET_USER}@${TARGET_HOST}:${TARGET_DIR}..."
 
-rsync -avz --exclude='venv' --exclude='.git' --exclude='__pycache__' --exclude='.DS_Store' \
+rsync -avz --exclude='venv' --exclude='.venv' --exclude='.git' --exclude='__pycache__' \
+    --exclude='.pytest_cache' --exclude='.DS_Store' \
     ./ ${TARGET_USER}@${TARGET_HOST}:${TARGET_DIR}
 
 echo "Deployment finished."

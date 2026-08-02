@@ -115,7 +115,9 @@ def main():
 
     print("\n[READY] Running.")
     print("  Keys [A,W,S,E,D,F,T,G,Y,H,U,J,K] -> Play Notes")
-    print("  [1] Mode  [2] Patch  [3] Note  [4] Cutoff")
+    print("  Keys [Z,X,C,V,B,N,M] -> Drums   [Space] -> Sustain (hold)")
+    print("  [1] Mode  [2] Patch  [3] Note  [4] Tone  [5] Play Mode (Normal/Layer/Split)")
+    print("  HW buttons: A/B long-press -> Sustain / Play Mode")
     print("  Ctrl+C to stop.\n")
 
     # Welcome chime

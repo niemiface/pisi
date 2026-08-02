@@ -11,6 +11,7 @@ import threading
 import os
 
 from src.config import CONFIG
+from src.audio.synth import DRUMS, DRUM_MAP
 
 try:
     from gpiozero import Button
@@ -32,12 +33,24 @@ except ImportError:
     HAS_EVDEV = False
 
 PINS = CONFIG["gpio"]["pins"]
+HOLD_THRESHOLD = 0.6  # seconds — how long a button must be held to fire its "long-press" action
 
 EVDEV_KEY_NOTE_MAP = {
     'KEY_A': 60, 'KEY_W': 61, 'KEY_S': 62, 'KEY_E': 63,
     'KEY_D': 64, 'KEY_F': 65, 'KEY_T': 66, 'KEY_G': 67,
     'KEY_Y': 68, 'KEY_H': 69, 'KEY_U': 70, 'KEY_J': 71,
     'KEY_K': 72, 'KEY_O': 73, 'KEY_L': 74,
+}
+
+# Bottom QWERTY row plays the drum kit on the drum channel — an instant playable drum pad.
+EVDEV_KEY_DRUM_MAP = {
+    'KEY_Z': 36,  # Kick
+    'KEY_X': 38,  # Snare
+    'KEY_C': 42,  # Closed Hat
+    'KEY_V': 46,  # Open Hat
+    'KEY_B': 49,  # Crash
+    'KEY_N': 51,  # Ride
+    'KEY_M': 39,  # Hand Clap
 }
 
 # ROADOM LE070-01 touchscreen: coordinates 0-4096, screen 1024x600
@@ -65,6 +78,23 @@ class HardwareController:
         self.setup_keyboard_listener()
         self.setup_touchscreen_listener()
 
+    def _bind_press_hold(self, btn, short_fn, long_fn):
+        """Fire short_fn on a quick tap, long_fn if held past HOLD_THRESHOLD —
+        without also firing short_fn on the way into a long press."""
+        state = {"t0": 0.0}
+
+        def _pressed():
+            state["t0"] = time.time()
+
+        def _released():
+            if time.time() - state["t0"] >= HOLD_THRESHOLD:
+                long_fn()
+            else:
+                short_fn()
+
+        btn.when_pressed = _pressed
+        btn.when_released = _released
+
     def setup_buttons(self):
         if not HAS_GPIOZERO:
             print("[WARNING] gpiozero unavailable.")
@@ -72,12 +102,15 @@ class HardwareController:
         for name, pin in PINS.items():
             try:
                 btn = Button(pin, pull_up=True, bounce_time=0.05)
-                if name == 'A': btn.when_pressed = self.on_button_a
-                elif name == 'B': btn.when_pressed = self.on_button_b
+                if name == 'A':
+                    self._bind_press_hold(btn, self.on_button_a, self.on_sustain_toggle)
+                elif name == 'B':
+                    self._bind_press_hold(btn, self.on_button_b, self.on_play_mode_cycle)
                 elif name == 'X':
                     btn.when_pressed = self.on_button_x
                     btn.when_released = self.on_button_x_release
-                elif name == 'Y': btn.when_pressed = self.on_button_y
+                elif name == 'Y':
+                    btn.when_pressed = self.on_button_y
                 self.buttons[name] = btn
                 print(f"[HW] Button {name} on GPIO {pin}")
             except Exception as e:
@@ -151,7 +184,13 @@ class HardwareController:
                                     self.pressed_keys.add(key_code)
                                     if key_code in EVDEV_KEY_NOTE_MAP:
                                         note = EVDEV_KEY_NOTE_MAP[key_code]
-                                        self.synth.note_on(note)
+                                        self.synth.play_note(note)
+                                    elif key_code in EVDEV_KEY_DRUM_MAP:
+                                        self.synth.note_on(EVDEV_KEY_DRUM_MAP[key_code], channel=DRUMS)
+                                    elif key_code == 'KEY_SPACE':
+                                        self.synth.set_sustain(True)
+                                    elif key_code == 'KEY_5':
+                                        self.on_play_mode_cycle()
                                     elif key_code == 'KEY_1': self.on_button_a()
                                     elif key_code == 'KEY_2': self.on_button_b()
                                     elif key_code == 'KEY_3': self.on_button_x()
@@ -161,7 +200,11 @@ class HardwareController:
                                 self.pressed_keys.discard(key_code)
                                 if key_code in EVDEV_KEY_NOTE_MAP:
                                     note = EVDEV_KEY_NOTE_MAP[key_code]
-                                    self.synth.note_off(note)
+                                    self.synth.release_note(note)
+                                elif key_code in EVDEV_KEY_DRUM_MAP:
+                                    self.synth.note_off(EVDEV_KEY_DRUM_MAP[key_code], channel=DRUMS)
+                                elif key_code == 'KEY_SPACE':
+                                    self.synth.set_sustain(False)
                             # event.value == 2 (repeat) is intentionally IGNORED
                     except (BlockingIOError, OSError):
                         pass
@@ -210,14 +253,14 @@ class HardwareController:
                                 note = self._pos_to_note(px, py)
                                 if note is not None:
                                     touch_note = note
-                                    self.synth.note_on(note)
+                                    self.synth.play_note(note)
                                     if self.hdmi:
                                         self.hdmi.touched_notes.add(note)
                                     print(f"[TOUCH] Tap ({px},{py}) -> Note {note}")
 
                             elif event.value == 0:  # Finger up
                                 if touch_note is not None:
-                                    self.synth.note_off(touch_note)
+                                    self.synth.release_note(touch_note)
                                     if self.hdmi:
                                         self.hdmi.touched_notes.discard(touch_note)
                                     touch_note = None
@@ -282,14 +325,7 @@ class HardwareController:
                     while self.running:
                         for port in opened_ports:
                             for msg in port.iter_pending():
-                                if msg.type == 'note_on':
-                                    v = msg.velocity / 127.0
-                                    if msg.velocity > 0:
-                                        self.synth.note_on(msg.note, v)
-                                    else:
-                                        self.synth.note_off(msg.note)
-                                elif msg.type == 'note_off':
-                                    self.synth.note_off(msg.note)
+                                self._handle_midi_message(msg)
                         time.sleep(0.002)
             except Exception:
                 pass
@@ -298,6 +334,23 @@ class HardwareController:
                     p.close()
 
         threading.Thread(target=midi_listener, daemon=True).start()
+
+    def _handle_midi_message(self, msg):
+        if msg.type == 'note_on':
+            if msg.velocity > 0:
+                self.synth.play_note(msg.note, msg.velocity / 127.0)
+            else:
+                self.synth.release_note(msg.note)  # note_on velocity 0 == note off, per MIDI spec
+        elif msg.type == 'note_off':
+            self.synth.release_note(msg.note)
+        elif msg.type == 'pitchwheel':
+            # mido gives -8192..8191; FluidSynth wants 0..16383.
+            self.synth.pitch_bend(msg.channel, msg.pitch + 8192)
+        elif msg.type == 'control_change':
+            if msg.control in (1, 7, 10, 11, 64):
+                self.synth.cc(msg.channel, msg.control, msg.value)
+        elif msg.type == 'program_change':
+            self.synth.apply_preset_by_program(msg.channel, msg.program)
 
     def on_button_a(self):
         self.renderer.set_mode(self.renderer.mode + 1)
@@ -312,14 +365,22 @@ class HardwareController:
     def on_button_x(self):
         note = self.test_notes[self.note_idx]
         self.note_idx = (self.note_idx + 1) % len(self.test_notes)
-        self.synth.note_on(note)
+        self.synth.play_note(note)
 
     def on_button_x_release(self):
         for note in self.test_notes:
-            self.synth.note_off(note)
+            self.synth.release_note(note)
 
     def on_button_y(self):
-        c = self.synth.cutoff + 1500.0
-        if c > 9000.0: c = 800.0
-        self.synth.cutoff = c
-        print(f"[HW] Cutoff: {c:.0f} Hz")
+        t = self.synth.tone + 16
+        if t > 127:
+            t = 0
+        self.synth.tone = t
+        print(f"[HW] Tone: {t}/127")
+
+    def on_sustain_toggle(self):
+        self.synth.toggle_sustain()
+        print(f"[HW] Sustain: {'ON' if self.synth.sustain_on else 'OFF'}")
+
+    def on_play_mode_cycle(self):
+        self.synth.cycle_play_mode()
