@@ -1,0 +1,12 @@
+st7789>=0.0.4
+pillow>=9.0.0
+numpy>=1.21.0
+sounddevice>=0.4.4
+scipy>=1.7.0
+gpiozero>=1.6.2
+rpi-lgpio>=0.4.0
+spidev>=3.5
+mido>=1.2.10
+python-rtmidi>=1.5.0
+evdev>=1.6.0
+pygame>=2.5.0
