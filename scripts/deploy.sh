@@ -2,8 +2,8 @@
 # Deploy project files to Raspberry Pi over rsync / SSH
 # Usage: ./scripts/deploy.sh
 
-TARGET_HOST="10.0.0.212"
-TARGET_USER="niemiface"
+TARGET_HOST="${PI_HOST:-10.0.0.212}"
+TARGET_USER="${PI_USER:-niemiface}"
 TARGET_DIR="~/pisi/"
 
 echo "Syncing local files to ${TARGET_USER}@${TARGET_HOST}:${TARGET_DIR}..."

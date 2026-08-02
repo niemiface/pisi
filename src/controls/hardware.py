@@ -10,6 +10,8 @@ import time
 import threading
 import os
 
+from src.config import CONFIG
+
 try:
     from gpiozero import Button
     HAS_GPIOZERO = True
@@ -29,7 +31,7 @@ try:
 except ImportError:
     HAS_EVDEV = False
 
-PINS = {'A': 5, 'B': 6, 'X': 16, 'Y': 24}
+PINS = CONFIG["gpio"]["pins"]
 
 EVDEV_KEY_NOTE_MAP = {
     'KEY_A': 60, 'KEY_W': 61, 'KEY_S': 62, 'KEY_E': 63,
@@ -41,8 +43,8 @@ EVDEV_KEY_NOTE_MAP = {
 # ROADOM LE070-01 touchscreen: coordinates 0-4096, screen 1024x600
 TOUCH_MAX_X = 4096
 TOUCH_MAX_Y = 4096
-SCREEN_W = 1024
-SCREEN_H = 600
+SCREEN_W = CONFIG["display"]["hdmi"]["width"]
+SCREEN_H = CONFIG["display"]["hdmi"]["height"]
 
 
 class HardwareController:

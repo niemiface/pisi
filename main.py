@@ -18,7 +18,8 @@ import numpy as np
 if "DISPLAY" not in os.environ:
     os.environ["DISPLAY"] = ":0"
 
-from src.audio.synth import SynthEngine
+from src.config import CONFIG
+from src.audio.synth import SynthEngine, HAS_FLUIDSYNTH, SOUNDFONT_PATH
 from src.audio.analyzer import AudioAnalyzer
 from src.display.renderer import DisplayRenderer
 from src.display.hdmi_renderer import HDMIRenderer
@@ -32,7 +33,28 @@ except ImportError:
     except ImportError:
         ST7789 = None
 
-ROTATION = 180
+ROTATION = CONFIG["display"]["st7789"]["rotation"]
+HDMI_WIDTH = CONFIG["display"]["hdmi"]["width"]
+HDMI_HEIGHT = CONFIG["display"]["hdmi"]["height"]
+
+
+def preflight_check():
+    """Fail fast with a clear message instead of limping along silently broken."""
+    problems = []
+    if not HAS_FLUIDSYNTH:
+        problems.append("pyfluidsynth is not importable (pip install pyfluidsynth)")
+    elif not os.path.exists(SOUNDFONT_PATH):
+        problems.append(f"No soundfont found at {SOUNDFONT_PATH}")
+    if not os.path.exists("/dev/spidev0.0") and not os.path.exists("/dev/spidev0.1"):
+        problems.append("No SPI device found at /dev/spidev0.* (ST7789 needs SPI enabled)")
+
+    if problems:
+        print("=" * 60)
+        print("[PREFLIGHT] Problems detected before startup:")
+        for p in problems:
+            print(f"[PREFLIGHT]   - {p}")
+        print("=" * 60)
+    return problems
 
 def init_st7789():
     if ST7789 is None:
@@ -56,6 +78,8 @@ def main():
     print("  Pi 4 Oscilloscope Studio & Touchscreen Synth")
     print("=========================================================")
 
+    preflight_check()
+
     # 1. Init ST7789 small LCD
     disp_st7789 = init_st7789()
 
@@ -72,7 +96,7 @@ def main():
     print("[INIT] Initializing HDMI Oscilloscope Studio...")
     hdmi = None
     try:
-        hdmi = HDMIRenderer(synth, width=1024, height=600)
+        hdmi = HDMIRenderer(synth, width=HDMI_WIDTH, height=HDMI_HEIGHT)
     except Exception as e:
         print(f"[HDMI] Skipped: {e}")
 

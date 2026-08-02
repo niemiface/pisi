@@ -3,14 +3,17 @@ import numpy as np
 import sounddevice as sd
 import traceback
 
+from src.config import CONFIG
+
 try:
     import fluidsynth
     HAS_FLUIDSYNTH = True
 except ImportError:
     HAS_FLUIDSYNTH = False
 
-SAMPLE_RATE = 44100
-BLOCK_SIZE = 1024
+SAMPLE_RATE = CONFIG["audio"]["sample_rate"]
+BLOCK_SIZE = CONFIG["audio"]["block_size"]
+SOUNDFONT_PATH = CONFIG["audio"]["soundfont_path"]
 
 class SynthEngine:
     # Map our preset names to General MIDI Program Numbers
@@ -47,20 +50,28 @@ class SynthEngine:
         
         self.fs = None
         self.sfid = None
-        
+
         if HAS_FLUIDSYNTH:
             try:
                 # Initialize FluidSynth (no driver started, we fetch samples manually)
                 self.fs = fluidsynth.Synth(samplerate=float(self.sample_rate))
                 # Load the standard GM soundfont installed via apt-get
-                sf_path = "/usr/share/sounds/sf2/FluidR3_GM.sf2"
-                self.sfid = self.fs.sfload(sf_path)
+                self.sfid = self.fs.sfload(SOUNDFONT_PATH)
                 if self.sfid == -1:
-                    print(f"[AUDIO] WARNING: SoundFont not found at {sf_path}")
+                    self._print_fatal_banner(f"SoundFont not found at {SOUNDFONT_PATH}")
             except Exception as e:
-                print(f"[AUDIO] FluidSynth init error: {e}")
+                self._print_fatal_banner(f"FluidSynth init error: {e}")
+        else:
+            self._print_fatal_banner("pyfluidsynth is not installed (import fluidsynth failed)")
 
         self.apply_preset(self.current_preset)
+
+    @staticmethod
+    def _print_fatal_banner(reason):
+        print("=" * 60)
+        print("[FATAL] Audio engine unavailable — output will be silence.")
+        print(f"[FATAL] Reason: {reason}")
+        print("=" * 60)
 
     def find_audio_device(self):
         try:

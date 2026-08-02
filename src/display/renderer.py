@@ -8,8 +8,10 @@ import math
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-WIDTH = 240
-HEIGHT = 240
+from src.config import CONFIG
+
+WIDTH = CONFIG["display"]["st7789"]["width"]
+HEIGHT = CONFIG["display"]["st7789"]["height"]
 
 # Color Palette Definitions (RGB)
 COLOR_BG = (12, 14, 24)

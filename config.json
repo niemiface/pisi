@@ -1,0 +1,26 @@
+{
+  "display": {
+    "st7789": {
+      "width": 240,
+      "height": 240,
+      "rotation": 180
+    },
+    "hdmi": {
+      "width": 1024,
+      "height": 600
+    }
+  },
+  "audio": {
+    "sample_rate": 44100,
+    "block_size": 1024,
+    "soundfont_path": "/usr/share/sounds/sf2/FluidR3_GM.sf2"
+  },
+  "gpio": {
+    "pins": {
+      "A": 5,
+      "B": 6,
+      "X": 16,
+      "Y": 24
+    }
+  }
+}
