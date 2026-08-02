@@ -191,6 +191,8 @@ class HardwareController:
                                         self.synth.set_sustain(True)
                                     elif key_code == 'KEY_5':
                                         self.on_play_mode_cycle()
+                                    elif key_code == 'KEY_6':
+                                        self.synth.cycle_soundfont()
                                     elif key_code == 'KEY_1': self.on_button_a()
                                     elif key_code == 'KEY_2': self.on_button_b()
                                     elif key_code == 'KEY_3': self.on_button_x()

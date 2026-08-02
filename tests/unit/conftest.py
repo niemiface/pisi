@@ -9,6 +9,7 @@ import sys
 import types
 
 import numpy as np
+import pytest
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _REPO_ROOT not in sys.path:
@@ -21,6 +22,9 @@ class _FakeFluidSynth:
 
     def sfload(self, path):
         return 1  # pretend the soundfont loaded fine
+
+    def sfunload(self, sfid):
+        pass
 
     def program_select(self, *args, **kwargs):
         pass
@@ -61,3 +65,9 @@ if "sounddevice" not in sys.modules:
     sounddevice_stub.query_devices = lambda: []
     sounddevice_stub.default = types.SimpleNamespace(device=(None, None))
     sys.modules["sounddevice"] = sounddevice_stub
+
+
+@pytest.fixture
+def synth():
+    from src.audio.synth import SynthEngine
+    return SynthEngine()

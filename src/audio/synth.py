@@ -1,9 +1,11 @@
+import os
 import time
 import numpy as np
 import sounddevice as sd
 import traceback
 
-from src.config import CONFIG
+from src.config import CONFIG, REPO_ROOT
+from src.audio.soundfont_manager import SoundfontManager
 
 try:
     import fluidsynth
@@ -13,7 +15,10 @@ except ImportError:
 
 SAMPLE_RATE = CONFIG["audio"]["sample_rate"]
 BLOCK_SIZE = CONFIG["audio"]["block_size"]
-SOUNDFONT_PATH = CONFIG["audio"]["soundfont_path"]
+
+SOUNDFONT_MANIFEST_PATH = os.path.join(REPO_ROOT, CONFIG["soundfonts"]["manifest_path"])
+DEFAULT_SOUNDFONT_ID = CONFIG["soundfonts"]["default_id"]
+MAX_RESIDENT_BYTES = CONFIG["soundfonts"]["max_resident_mb"] * 1024 * 1024
 
 LEAD = CONFIG["channels"]["lead"]
 LAYER = CONFIG["channels"]["layer"]
@@ -66,6 +71,8 @@ class SynthEngine:
 
         self.fs = None
         self.sfid = None
+        self.soundfonts = None
+        self.current_soundfont_id = None
 
         self.play_mode = PLAY_MODE_NORMAL
         self.split_point = CONFIG["performance"]["split_point"]
@@ -79,11 +86,13 @@ class SynthEngine:
             try:
                 # Initialize FluidSynth (no driver started, we fetch samples manually)
                 self.fs = fluidsynth.Synth(samplerate=float(self.sample_rate))
-                # Load the standard GM soundfont installed via apt-get
-                self.sfid = self.fs.sfload(SOUNDFONT_PATH)
+                self.soundfonts = SoundfontManager(self.fs, REPO_ROOT, MAX_RESIDENT_BYTES)
+                self.soundfonts.load_manifest(SOUNDFONT_MANIFEST_PATH)
+                self.sfid = self.soundfonts.ensure_loaded(DEFAULT_SOUNDFONT_ID)
                 if self.sfid == -1:
-                    self._print_fatal_banner(f"SoundFont not found at {SOUNDFONT_PATH}")
+                    self._print_fatal_banner(f"Default soundfont '{DEFAULT_SOUNDFONT_ID}' failed to load")
                 else:
+                    self.current_soundfont_id = DEFAULT_SOUNDFONT_ID
                     self._init_effects()
                     self._init_performance_channels()
             except Exception as e:
@@ -257,6 +266,39 @@ class SynthEngine:
                 return
         if channel == LEAD:
             self.current_preset = f"Program {program}"
+
+    def apply_manifest_preset(self, sf_id, preset_name=None, channel=LEAD):
+        """Load (if needed) and select a preset from a soundfont-manager-managed
+        font. With no preset_name, uses the font's first favorite/preset."""
+        if not self.soundfonts:
+            return
+        sfid = self.soundfonts.ensure_loaded(sf_id)
+        if sfid == -1:
+            return  # missing/broken file — soundfonts.ensure_loaded already logged why
+
+        presets = self.soundfonts.list_presets(sf_id)
+        preset = None
+        if preset_name:
+            preset = next((p for p in presets if p.name == preset_name), None)
+        if preset is None and presets:
+            preset = presets[0]
+        bank, program, name = (preset.bank, preset.program, preset.name) if preset else (0, 0, sf_id)
+
+        if self.fs:
+            self.fs.program_select(channel, sfid, bank, program)
+            self.fs.cc(channel, 91, 40)
+            self.fs.cc(channel, 93, 10)
+        if channel == LEAD:
+            self.sfid = sfid
+            self.current_soundfont_id = sf_id
+            self.current_preset = name
+        print(f"[AUDIO] Soundfont '{sf_id}' program {program} ({name}) on channel {channel}")
+
+    def cycle_soundfont(self):
+        if not self.soundfonts:
+            return
+        next_id = self.soundfonts.next_font(self.current_soundfont_id)
+        self.apply_manifest_preset(next_id)
 
     @property
     def reverb_send(self):

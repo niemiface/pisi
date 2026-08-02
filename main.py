@@ -18,8 +18,8 @@ import numpy as np
 if "DISPLAY" not in os.environ:
     os.environ["DISPLAY"] = ":0"
 
-from src.config import CONFIG
-from src.audio.synth import SynthEngine, HAS_FLUIDSYNTH, SOUNDFONT_PATH
+from src.config import CONFIG, REPO_ROOT
+from src.audio.synth import SynthEngine, HAS_FLUIDSYNTH, SOUNDFONT_MANIFEST_PATH, DEFAULT_SOUNDFONT_ID
 from src.audio.analyzer import AudioAnalyzer
 from src.display.renderer import DisplayRenderer
 from src.display.hdmi_renderer import HDMIRenderer
@@ -43,8 +43,23 @@ def preflight_check():
     problems = []
     if not HAS_FLUIDSYNTH:
         problems.append("pyfluidsynth is not importable (pip install pyfluidsynth)")
-    elif not os.path.exists(SOUNDFONT_PATH):
-        problems.append(f"No soundfont found at {SOUNDFONT_PATH}")
+    elif not os.path.exists(SOUNDFONT_MANIFEST_PATH):
+        problems.append(f"No soundfont manifest at {SOUNDFONT_MANIFEST_PATH}")
+    else:
+        import json
+        with open(SOUNDFONT_MANIFEST_PATH) as f:
+            manifest = json.load(f)
+        default_entry = next(
+            (e for e in manifest.get("soundfonts", []) if e.get("id") == DEFAULT_SOUNDFONT_ID), None
+        )
+        if default_entry is None:
+            problems.append(f"Default soundfont id '{DEFAULT_SOUNDFONT_ID}' not in manifest")
+        else:
+            path = default_entry["path"]
+            if not os.path.isabs(path):
+                path = os.path.join(REPO_ROOT, path)
+            if not os.path.exists(path):
+                problems.append(f"Default soundfont '{DEFAULT_SOUNDFONT_ID}' missing on disk at {path}")
     if not os.path.exists("/dev/spidev0.0") and not os.path.exists("/dev/spidev0.1"):
         problems.append("No SPI device found at /dev/spidev0.* (ST7789 needs SPI enabled)")
 
@@ -116,7 +131,7 @@ def main():
     print("\n[READY] Running.")
     print("  Keys [A,W,S,E,D,F,T,G,Y,H,U,J,K] -> Play Notes")
     print("  Keys [Z,X,C,V,B,N,M] -> Drums   [Space] -> Sustain (hold)")
-    print("  [1] Mode  [2] Patch  [3] Note  [4] Tone  [5] Play Mode (Normal/Layer/Split)")
+    print("  [1] Mode  [2] Patch  [3] Note  [4] Tone  [5] Play Mode  [6] Soundfont")
     print("  HW buttons: A/B long-press -> Sustain / Play Mode")
     print("  Ctrl+C to stop.\n")
 

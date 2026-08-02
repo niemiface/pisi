@@ -1,0 +1,43 @@
+{
+  "soundfonts": [
+    {
+      "id": "fluidr3",
+      "name": "FluidR3 GM",
+      "path": "/usr/share/sounds/sf2/FluidR3_GM.sf2",
+      "type": "gm",
+      "lazy": false,
+      "license": "MIT",
+      "favorites": [
+        {"name": "Grand Piano", "bank": 0, "program": 0},
+        {"name": "Electric Piano", "bank": 0, "program": 4},
+        {"name": "Drawbar Organ", "bank": 0, "program": 16},
+        {"name": "Synth Strings", "bank": 0, "program": 50},
+        {"name": "Warm Pad", "bank": 0, "program": 89}
+      ]
+    },
+    {
+      "id": "timgm6mb",
+      "name": "TimGM6mb (compact GM)",
+      "path": "/usr/share/sounds/sf2/TimGM6mb.sf2",
+      "type": "gm",
+      "lazy": true,
+      "license": "Public Domain",
+      "favorites": [
+        {"name": "Grand Piano", "bank": 0, "program": 0},
+        {"name": "Warm Pad", "bank": 0, "program": 89}
+      ]
+    },
+    {
+      "id": "generaluser-gs",
+      "name": "GeneralUser GS",
+      "path": "soundfonts/GeneralUser-GS.sf2",
+      "type": "gm",
+      "lazy": true,
+      "license": "Permissive, redistributable (see documentation in the upstream repo)",
+      "favorites": [
+        {"name": "Grand Piano", "bank": 0, "program": 0},
+        {"name": "Warm Pad", "bank": 0, "program": 89}
+      ]
+    }
+  ]
+}

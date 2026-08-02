@@ -3,8 +3,8 @@
 import json
 import os
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_CONFIG_PATH = os.path.join(_ROOT, "config.json")
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_CONFIG_PATH = os.path.join(REPO_ROOT, "config.json")
 
 with open(_CONFIG_PATH) as _f:
     CONFIG = json.load(_f)

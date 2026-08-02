@@ -62,7 +62,9 @@ fi
 
 source "$VENV_DIR/bin/activate"
 pip install --upgrade pip
-pip install st7789 pyfluidsynth pillow numpy sounddevice scipy gpiozero rpi-lgpio evdev mido python-rtmidi pygame
+pip install st7789 pyfluidsynth pillow numpy sounddevice scipy gpiozero rpi-lgpio evdev mido python-rtmidi pygame sf2utils
+# sf2utils imports the stdlib `audioop` module, removed in Python 3.13 — this backport restores it.
+pip install 'audioop-lts>=0.2.2; python_version >= "3.13"'
 
 echo "=== Setup Completed Successfully! ==="
 echo "Please reboot your Raspberry Pi using 'sudo reboot' for device tree overlays to take effect."

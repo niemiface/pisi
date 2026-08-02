@@ -4,17 +4,10 @@ single most likely place to introduce stuck notes (per the expansion plan's
 own warning), so it gets real tests instead of only manual Pi verification.
 """
 
-import pytest
-
 from src.audio.synth import (
-    SynthEngine, LEAD, LAYER, SPLIT_BASS, DRUMS,
+    LEAD, LAYER, SPLIT_BASS, DRUMS,
     PLAY_MODE_NORMAL, PLAY_MODE_LAYER, PLAY_MODE_SPLIT,
 )
-
-
-@pytest.fixture
-def synth():
-    return SynthEngine()
 
 
 def test_normal_mode_single_channel(synth):

@@ -12,8 +12,12 @@
   },
   "audio": {
     "sample_rate": 44100,
-    "block_size": 1024,
-    "soundfont_path": "/usr/share/sounds/sf2/FluidR3_GM.sf2"
+    "block_size": 1024
+  },
+  "soundfonts": {
+    "manifest_path": "soundfonts/manifest.json",
+    "default_id": "fluidr3",
+    "max_resident_mb": 400
   },
   "gpio": {
     "pins": {
