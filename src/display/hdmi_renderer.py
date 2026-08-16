@@ -33,6 +33,8 @@ class HDMIRenderer:
         self.screen = None
         self.clock = None
         self.touched_notes = set()
+        self.should_quit = False
+        self.quit_rect = None  # set each frame in render()
 
         self.white_notes = [48, 50, 52, 53, 55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72]
         self.black_notes = {49: 0, 51: 1, 54: 3, 56: 4, 58: 5, 61: 7, 63: 8, 66: 10, 68: 11, 70: 12}
@@ -72,23 +74,40 @@ class HDMIRenderer:
                 return note
         return None
 
+    def check_quit_tap(self, px, py):
+        """Called by the evdev touchscreen thread (hardware.py) for every
+        finger-down event. Returns True and sets should_quit if the tap
+        landed on the on-screen X close button."""
+        if self.quit_rect and self.quit_rect.collidepoint(px, py):
+            self.should_quit = True
+            print("[HDMI] Quit button tapped.")
+            return True
+        return False
+
     def render(self, analyzer, synth):
         if not self.screen:
             return
 
+        # NOTE: real touchscreen input (multi-finger chords) is handled by the
+        # dedicated evdev multitouch thread in HardwareController, which also
+        # updates self.touched_notes for rendering. Only mouse clicks (for
+        # testing at a desk with no touchscreen) are handled here, and mouse
+        # is always single-touch by nature so clear-all-on-up is correct for it.
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pass
+                self.should_quit = True
             elif event.type == pygame.VIDEORESIZE:
                 self.width, self.height = event.w, event.h
                 self.screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
-            elif event.type in (pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN):
-                pos = getattr(event, 'pos', (int(getattr(event, 'x', 0) * self.width), int(getattr(event, 'y', 0) * self.height)))
-                note = self._get_note_at_pos(pos)
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if self.quit_rect and self.quit_rect.collidepoint(event.pos):
+                    self.should_quit = True
+                    continue
+                note = self._get_note_at_pos(event.pos)
                 if note:
                     self.touched_notes.add(note)
                     self.synth.note_on(note)
-            elif event.type in (pygame.MOUSEBUTTONUP, pygame.FINGERUP):
+            elif event.type == pygame.MOUSEBUTTONUP:
                 for note in list(self.touched_notes):
                     self.synth.note_off(note)
                 self.touched_notes.clear()
@@ -100,7 +119,16 @@ class HDMIRenderer:
         self.screen.blit(self.font_title.render("REAL-TIME OSCILLOSCOPE", True, COLOR_CYAN), (16, 10))
         info = f"{synth.current_preset}  |  {int(synth.cutoff)} Hz"
         info_s = self.font_sub.render(info, True, COLOR_TEXT)
-        self.screen.blit(info_s, (self.width - info_s.get_width() - 16, 14))
+        self.screen.blit(info_s, (self.width - info_s.get_width() - 60, 14))
+
+        # Quit (X) button — top-right corner, always visible and easy to tap
+        btn_size = 36
+        qx = self.width - btn_size - 8
+        qy = 4
+        self.quit_rect = pygame.Rect(qx, qy, btn_size, btn_size)
+        pygame.draw.rect(self.screen, (180, 30, 40), self.quit_rect, border_radius=6)
+        pygame.draw.line(self.screen, (255, 255, 255), (qx + 9, qy + 9), (qx + btn_size - 9, qy + btn_size - 9), 3)
+        pygame.draw.line(self.screen, (255, 255, 255), (qx + btn_size - 9, qy + 9), (qx + 9, qy + btn_size - 9), 3)
 
         # Oscilloscope
         self._render_oscilloscope(synth, 16, 54, self.width - 32, self.height - 210)

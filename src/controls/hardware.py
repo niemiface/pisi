@@ -169,15 +169,18 @@ class HardwareController:
         threading.Thread(target=keyboard_loop, daemon=True).start()
 
     def setup_touchscreen_listener(self):
-        """Touchscreen listener thread — auto-reconnects on USB disconnect."""
+        """Touchscreen listener thread — auto-reconnects on USB disconnect.
+        Uses the Type B (protocol B) multitouch slot model so multiple
+        fingers can be down at once, letting chords be built one note
+        at a time instead of only firing on simultaneous taps."""
         if not HAS_EVDEV:
             return
 
         def touch_loop():
-            touch_x = 0
-            touch_y = 0
-            touch_note = None
             connected = False
+            # Per-slot tracking: slot_id -> {'x':.., 'y':.., 'note':.., 'tracking_id':..}
+            slots = {}
+            current_slot = 0
 
             while self.running:
                 # Try to find touchscreen if not connected
@@ -186,6 +189,8 @@ class HardwareController:
                     if dev:
                         print(f"[TOUCH] Connected: '{dev.name}' at {dev.path}")
                         connected = True
+                        slots = {}
+                        current_slot = 0
                     else:
                         time.sleep(1.0)  # Retry every second
                         continue
@@ -194,43 +199,63 @@ class HardwareController:
                 try:
                     for event in dev.read():
                         if event.type == ecodes.EV_ABS:
-                            if event.code in (ecodes.ABS_X, ecodes.ABS_MT_POSITION_X):
-                                touch_x = event.value
-                            elif event.code in (ecodes.ABS_Y, ecodes.ABS_MT_POSITION_Y):
-                                touch_y = event.value
+                            if event.code == ecodes.ABS_MT_SLOT:
+                                current_slot = event.value
+                            elif event.code == ecodes.ABS_MT_TRACKING_ID:
+                                if event.value == -1:
+                                    # Finger lifted on this slot
+                                    st = slots.pop(current_slot, None)
+                                    if st and st.get('note') not in (None, -1):
+                                        self.synth.note_off(st['note'])
+                                        if self.hdmi:
+                                            self.hdmi.touched_notes.discard(st['note'])
+                                else:
+                                    slots.setdefault(current_slot, {})['tracking_id'] = event.value
+                            elif event.code in (ecodes.ABS_MT_POSITION_X, ecodes.ABS_X):
+                                slots.setdefault(current_slot, {})['x'] = event.value
+                            elif event.code in (ecodes.ABS_MT_POSITION_Y, ecodes.ABS_Y):
+                                slots.setdefault(current_slot, {})['y'] = event.value
 
                         elif event.type == ecodes.EV_KEY and event.code == ecodes.BTN_TOUCH:
-                            if event.value == 1:  # Finger down
-                                # Map 0-4096 touch coords to screen pixels
-                                px = int(touch_x / TOUCH_MAX_X * SCREEN_W)
-                                py = int(touch_y / TOUCH_MAX_Y * SCREEN_H)
+                            # Fallback for single-touch-only reporting (no slots seen yet)
+                            if event.value == 1 and 0 not in slots:
+                                slots[0] = {}
+                            elif event.value == 0 and not slots:
+                                pass
 
+                        elif event.type == ecodes.EV_SYN and event.code == ecodes.SYN_REPORT:
+                            # End of touch frame: resolve notes for any slot missing one
+                            st = slots.get(current_slot)
+                            if st and 'x' in st and 'y' in st and st.get('note') is None:
+                                px = int(st['x'] / TOUCH_MAX_X * SCREEN_W)
+                                py = int(st['y'] / TOUCH_MAX_Y * SCREEN_H)
+                                if self.hdmi and self.hdmi.check_quit_tap(px, py):
+                                    st['note'] = -1  # mark handled, not a real note
+                                    continue
                                 note = self._pos_to_note(px, py)
                                 if note is not None:
-                                    touch_note = note
+                                    st['note'] = note
                                     self.synth.note_on(note)
                                     if self.hdmi:
                                         self.hdmi.touched_notes.add(note)
-                                    print(f"[TOUCH] Tap ({px},{py}) -> Note {note}")
-
-                            elif event.value == 0:  # Finger up
-                                if touch_note is not None:
-                                    self.synth.note_off(touch_note)
-                                    if self.hdmi:
-                                        self.hdmi.touched_notes.discard(touch_note)
-                                    touch_note = None
+                                    print(f"[TOUCH] Slot {current_slot} ({px},{py}) -> Note {note} | {len(slots)} finger(s) down")
 
                 except BlockingIOError:
                     pass
                 except OSError:
                     # Device disconnected — will auto-reconnect
                     print("[TOUCH] Disconnected, waiting to reconnect...")
+                    for st in slots.values():
+                        if st.get('note') not in (None, -1):
+                            self.synth.note_off(st['note'])
+                            if self.hdmi:
+                                self.hdmi.touched_notes.discard(st['note'])
+                    slots = {}
                     connected = False
-                    touch_note = None
                     time.sleep(0.5)
                     continue
 
-                time.sleep(0.008)
+                time.sleep(0.004)
 
         threading.Thread(target=touch_loop, daemon=True).start()
 

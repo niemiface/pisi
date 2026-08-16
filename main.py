@@ -131,6 +131,9 @@ def main():
             if hdmi and hdmi.screen:
                 try:
                     hdmi.render(analyzer, synth)
+                    if hdmi.should_quit:
+                        print("\n[SHUTDOWN] Quit button pressed...")
+                        running = False
                 except Exception as e:
                     print(f"[HDMI ERROR] {e}")
                     traceback.print_exc()
