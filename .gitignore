@@ -3,5 +3,6 @@ venv
 __pycache__/
 *.pyc
 .DS_Store
+.pytest_cache/
 *.sf2
 *.sf3

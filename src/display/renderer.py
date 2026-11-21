@@ -8,8 +8,10 @@ import math
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-WIDTH = 240
-HEIGHT = 240
+from src.config import CONFIG
+
+WIDTH = CONFIG["display"]["st7789"]["width"]
+HEIGHT = CONFIG["display"]["st7789"]["height"]
 
 # Color Palette Definitions (RGB)
 COLOR_BG = (12, 14, 24)
@@ -25,13 +27,14 @@ class DisplayRenderer:
     MODE_SPECTRUM = 0
     MODE_OSCILLOSCOPE = 1
     MODE_SYNTH_DASH = 2
+    MODE_EFFECTS = 3
 
     def __init__(self, width=WIDTH, height=HEIGHT):
         self.width = width
         self.height = height
         self.mode = self.MODE_SPECTRUM
         self.font = ImageFont.load_default()
-        self.mode_names = ["Spectrum Analyzer", "Oscilloscope", "Synth Dashboard"]
+        self.mode_names = ["Spectrum Analyzer", "Oscilloscope", "Synth Dashboard", "Effects"]
 
     def set_mode(self, mode):
         self.mode = mode % len(self.mode_names)
@@ -51,10 +54,12 @@ class DisplayRenderer:
             self._render_oscilloscope(draw, analyzer, synth)
         elif self.mode == self.MODE_SYNTH_DASH:
             self._render_synth_dashboard(draw, synth)
+        elif self.mode == self.MODE_EFFECTS:
+            self._render_effects(draw, synth)
 
         # Footer button guide
         draw.line((0, self.height - 18, self.width, self.height - 18), fill=COLOR_CARD)
-        draw.text((8, self.height - 14), "A:Mode  B:Preset  X:Tone  Y:Cutoff", fill=COLOR_MUTED, font=self.font)
+        draw.text((8, self.height - 14), "A:Mode  B:Preset  X:Note  Y:Tone", fill=COLOR_MUTED, font=self.font)
 
         return img
 
@@ -127,18 +132,18 @@ class DisplayRenderer:
         draw.text((12, 48), f"Volume RMS: {analyzer.rms:.2f}", fill=COLOR_TEXT, font=self.font)
 
     def _render_synth_dashboard(self, draw, synth):
-        """Renders synth parameters, active patch info, and filter cutoff dial."""
+        """Renders synth parameters, active patch info, and tone (filter brightness) dial."""
         draw.text((12, 34), "SYNTH PARAMETERS", fill=COLOR_YELLOW, font=self.font)
-        
+
         # Patch Info
         draw.rectangle((12, 52, self.width - 12, 95), fill=COLOR_CARD, outline=(40, 50, 80))
         draw.text((20, 60), f"Patch: {synth.current_preset}", fill=COLOR_TEXT, font=self.font)
-        draw.text((20, 75), f"Mode: SF2", fill=COLOR_CYAN, font=self.font)
+        draw.text((20, 75), f"Mode: {synth.play_mode.upper()}  Sustain: {'ON' if synth.sustain_on else 'OFF'}", fill=COLOR_CYAN, font=self.font)
 
-        # Filter Cutoff Bar
-        draw.text((12, 108), f"Cutoff: {int(synth.cutoff)} Hz", fill=COLOR_TEXT, font=self.font)
-        cutoff_ratio = min(1.0, max(0.0, synth.cutoff / 10000.0))
-        bar_w = int(cutoff_ratio * (self.width - 24))
+        # Tone (MIDI CC74 brightness, 0-127 — not a real frequency) Bar
+        draw.text((12, 108), f"Tone: {synth.tone}/127", fill=COLOR_TEXT, font=self.font)
+        tone_ratio = synth.tone / 127.0
+        bar_w = int(tone_ratio * (self.width - 24))
         draw.rectangle((12, 125, self.width - 12, 138), fill=(25, 30, 50))
         draw.rectangle((12, 125, 12 + bar_w, 138), fill=COLOR_GREEN)
 
@@ -147,3 +152,20 @@ class DisplayRenderer:
         vol_w = int(synth.volume * (self.width - 24))
         draw.rectangle((12, 165, self.width - 12, 178), fill=(25, 30, 50))
         draw.rectangle((12, 165, 12 + vol_w, 178), fill=COLOR_CYAN)
+
+    def _render_effects(self, draw, synth):
+        """Renders reverb/chorus send levels for the current preset."""
+        draw.text((12, 34), "EFFECTS SEND (current patch)", fill=COLOR_YELLOW, font=self.font)
+        draw.text((12, 52), f"Patch: {synth.current_preset}", fill=COLOR_TEXT, font=self.font)
+
+        draw.text((12, 80), f"Reverb: {synth.reverb_send}/127", fill=COLOR_TEXT, font=self.font)
+        reverb_ratio = synth.reverb_send / 127.0
+        bar_w = int(reverb_ratio * (self.width - 24))
+        draw.rectangle((12, 97, self.width - 12, 110), fill=(25, 30, 50))
+        draw.rectangle((12, 97, 12 + bar_w, 110), fill=COLOR_CYAN)
+
+        draw.text((12, 122), f"Chorus: {synth.chorus_send}/127", fill=COLOR_TEXT, font=self.font)
+        chorus_ratio = synth.chorus_send / 127.0
+        bar_w = int(chorus_ratio * (self.width - 24))
+        draw.rectangle((12, 139, self.width - 12, 152), fill=(25, 30, 50))
+        draw.rectangle((12, 139, 12 + bar_w, 152), fill=COLOR_MAGENTA)

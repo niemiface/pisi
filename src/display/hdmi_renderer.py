@@ -106,10 +106,10 @@ class HDMIRenderer:
                 note = self._get_note_at_pos(event.pos)
                 if note:
                     self.touched_notes.add(note)
-                    self.synth.note_on(note)
+                    self.synth.play_note(note)
             elif event.type == pygame.MOUSEBUTTONUP:
                 for note in list(self.touched_notes):
-                    self.synth.note_off(note)
+                    self.synth.release_note(note)
                 self.touched_notes.clear()
 
         self.screen.fill(COLOR_BG)
@@ -117,7 +117,7 @@ class HDMIRenderer:
         # Header
         pygame.draw.rect(self.screen, COLOR_PANEL, (0, 0, self.width, 44))
         self.screen.blit(self.font_title.render("REAL-TIME OSCILLOSCOPE", True, COLOR_CYAN), (16, 10))
-        info = f"{synth.current_preset}  |  {int(synth.cutoff)} Hz"
+        info = f"{synth.current_preset}  |  Tone {synth.tone}/127  |  {synth.play_mode.upper()}"
         info_s = self.font_sub.render(info, True, COLOR_TEXT)
         self.screen.blit(info_s, (self.width - info_s.get_width() - 60, 14))
 
