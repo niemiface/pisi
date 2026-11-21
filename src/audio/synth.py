@@ -34,36 +34,159 @@ PLAY_MODES = [PLAY_MODE_NORMAL, PLAY_MODE_LAYER, PLAY_MODE_SPLIT]
 
 
 class SynthEngine:
-    # Map our preset names to General MIDI Program Numbers
-    # (FluidR3_GM contains 128 standard instruments)
-    # reverb_send/chorus_send are MIDI CC91/93 (0-127): how much of this
-    # instrument's signal feeds the shared reverb/chorus effects.
+    # Full General MIDI instrument set (128 programs, per the GM1 spec).
+    # FluidR3_GM.sf2 (and any GM-compliant soundfont) implements all of these.
+    # reverb_send/chorus_send are MIDI CC91/93 (0-127). Hand-tuned values are kept
+    # for the original 20 instruments; the rest use the defaults in apply_preset().
     PRESETS = {
-        "Grand Piano":     {"program": 0,   "reverb_send": 40, "chorus_send": 10},
-        "Electric Piano":  {"program": 4,   "reverb_send": 30, "chorus_send": 20},
-        "Drawbar Organ":   {"program": 16,  "reverb_send": 20, "chorus_send": 40},
-        "Church Organ":    {"program": 19,  "reverb_send": 90, "chorus_send": 20},
-        "Acoustic Guitar": {"program": 24,  "reverb_send": 30, "chorus_send": 10},
-        "Electric Bass":   {"program": 33,  "reverb_send": 5,  "chorus_send": 0},
-        "Synth Bass":      {"program": 38,  "reverb_send": 5,  "chorus_send": 0},
-        "String Ensemble": {"program": 48,  "reverb_send": 60, "chorus_send": 40},
-        "Synth Strings":   {"program": 50,  "reverb_send": 60, "chorus_send": 50},
-        "Choir Aahs":      {"program": 52,  "reverb_send": 70, "chorus_send": 30},
-        "Trumpet":         {"program": 56,  "reverb_send": 40, "chorus_send": 10},
-        "Brass Section":   {"program": 61,  "reverb_send": 40, "chorus_send": 20},
-        "Tenor Sax":       {"program": 66,  "reverb_send": 35, "chorus_send": 15},
-        "Flute":           {"program": 73,  "reverb_send": 45, "chorus_send": 20},
-        "Square Lead":     {"program": 80,  "reverb_send": 20, "chorus_send": 30},
-        "Saw Lead":        {"program": 81,  "reverb_send": 25, "chorus_send": 35},
-        "Chiff Lead":      {"program": 83,  "reverb_send": 20, "chorus_send": 25},
-        "Warm Pad":        {"program": 89,  "reverb_send": 90, "chorus_send": 50},
-        "Choir Pad":       {"program": 91,  "reverb_send": 90, "chorus_send": 40},
-        "Sci-Fi":          {"program": 103, "reverb_send": 60, "chorus_send": 70},
+        # Piano
+        "Acoustic Grand Piano": {"program": 0, "reverb_send": 40, "chorus_send": 10},
+        "Bright Acoustic Piano": {"program": 1},
+        "Electric Grand Piano": {"program": 2},
+        "Honky-tonk Piano": {"program": 3},
+        "Electric Piano 1": {"program": 4, "reverb_send": 30, "chorus_send": 20},
+        "Electric Piano 2": {"program": 5},
+        "Harpsichord": {"program": 6},
+        "Clavinet": {"program": 7},
+        # Chromatic Percussion
+        "Celesta": {"program": 8},
+        "Glockenspiel": {"program": 9},
+        "Music Box": {"program": 10},
+        "Vibraphone": {"program": 11},
+        "Marimba": {"program": 12},
+        "Xylophone": {"program": 13},
+        "Tubular Bells": {"program": 14},
+        "Dulcimer": {"program": 15},
+        # Organ
+        "Drawbar Organ": {"program": 16, "reverb_send": 20, "chorus_send": 40},
+        "Percussive Organ": {"program": 17},
+        "Rock Organ": {"program": 18},
+        "Church Organ": {"program": 19, "reverb_send": 90, "chorus_send": 20},
+        "Reed Organ": {"program": 20},
+        "Accordion": {"program": 21},
+        "Harmonica": {"program": 22},
+        "Tango Accordion": {"program": 23},
+        # Guitar
+        "Acoustic Guitar (nylon)": {"program": 24, "reverb_send": 30, "chorus_send": 10},
+        "Acoustic Guitar (steel)": {"program": 25},
+        "Electric Guitar (jazz)": {"program": 26},
+        "Electric Guitar (clean)": {"program": 27},
+        "Electric Guitar (muted)": {"program": 28},
+        "Overdriven Guitar": {"program": 29},
+        "Distortion Guitar": {"program": 30},
+        "Guitar Harmonics": {"program": 31},
+        # Bass
+        "Acoustic Bass": {"program": 32},
+        "Electric Bass (finger)": {"program": 33, "reverb_send": 5, "chorus_send": 0},
+        "Electric Bass (pick)": {"program": 34},
+        "Fretless Bass": {"program": 35},
+        "Slap Bass 1": {"program": 36},
+        "Slap Bass 2": {"program": 37},
+        "Synth Bass 1": {"program": 38, "reverb_send": 5, "chorus_send": 0},
+        "Synth Bass 2": {"program": 39},
+        # Strings
+        "Violin": {"program": 40},
+        "Viola": {"program": 41},
+        "Cello": {"program": 42},
+        "Contrabass": {"program": 43},
+        "Tremolo Strings": {"program": 44},
+        "Pizzicato Strings": {"program": 45},
+        "Orchestral Harp": {"program": 46},
+        "Timpani": {"program": 47},
+        "String Ensemble 1": {"program": 48, "reverb_send": 60, "chorus_send": 40},
+        "String Ensemble 2": {"program": 49},
+        "Synth Strings 1": {"program": 50, "reverb_send": 60, "chorus_send": 50},
+        "Synth Strings 2": {"program": 51},
+        "Choir Aahs": {"program": 52, "reverb_send": 70, "chorus_send": 30},
+        "Voice Oohs": {"program": 53},
+        "Synth Choir": {"program": 54},
+        "Orchestra Hit": {"program": 55},
+        # Brass
+        "Trumpet": {"program": 56, "reverb_send": 40, "chorus_send": 10},
+        "Trombone": {"program": 57},
+        "Tuba": {"program": 58},
+        "Muted Trumpet": {"program": 59},
+        "French Horn": {"program": 60},
+        "Brass Section": {"program": 61, "reverb_send": 40, "chorus_send": 20},
+        "Synth Brass 1": {"program": 62},
+        "Synth Brass 2": {"program": 63},
+        # Reed
+        "Soprano Sax": {"program": 64},
+        "Alto Sax": {"program": 65},
+        "Tenor Sax": {"program": 66, "reverb_send": 35, "chorus_send": 15},
+        "Baritone Sax": {"program": 67},
+        "Oboe": {"program": 68},
+        "English Horn": {"program": 69},
+        "Bassoon": {"program": 70},
+        "Clarinet": {"program": 71},
+        # Pipe
+        "Piccolo": {"program": 72},
+        "Flute": {"program": 73, "reverb_send": 45, "chorus_send": 20},
+        "Recorder": {"program": 74},
+        "Pan Flute": {"program": 75},
+        "Blown Bottle": {"program": 76},
+        "Shakuhachi": {"program": 77},
+        "Whistle": {"program": 78},
+        "Ocarina": {"program": 79},
+        # Synth Lead
+        "Square Lead": {"program": 80, "reverb_send": 20, "chorus_send": 30},
+        "Saw Lead": {"program": 81, "reverb_send": 25, "chorus_send": 35},
+        "Calliope Lead": {"program": 82},
+        "Chiff Lead": {"program": 83, "reverb_send": 20, "chorus_send": 25},
+        "Charang Lead": {"program": 84},
+        "Voice Lead": {"program": 85},
+        "Fifths Lead": {"program": 86},
+        "Bass + Lead": {"program": 87},
+        # Synth Pad
+        "New Age Pad": {"program": 88},
+        "Warm Pad": {"program": 89, "reverb_send": 90, "chorus_send": 50},
+        "Polysynth Pad": {"program": 90},
+        "Choir Pad": {"program": 91, "reverb_send": 90, "chorus_send": 40},
+        "Bowed Pad": {"program": 92},
+        "Metallic Pad": {"program": 93},
+        "Halo Pad": {"program": 94},
+        "Sweep Pad": {"program": 95},
+        # Synth Effects
+        "Rain FX": {"program": 96},
+        "Soundtrack FX": {"program": 97},
+        "Crystal FX": {"program": 98},
+        "Atmosphere FX": {"program": 99},
+        "Brightness FX": {"program": 100},
+        "Goblins FX": {"program": 101},
+        "Echoes FX": {"program": 102},
+        "Sci-Fi FX": {"program": 103, "reverb_send": 60, "chorus_send": 70},
+        # Ethnic
+        "Sitar": {"program": 104},
+        "Banjo": {"program": 105},
+        "Shamisen": {"program": 106},
+        "Koto": {"program": 107},
+        "Kalimba": {"program": 108},
+        "Bagpipe": {"program": 109},
+        "Fiddle": {"program": 110},
+        "Shanai": {"program": 111},
+        # Percussive
+        "Tinkle Bell": {"program": 112},
+        "Agogo": {"program": 113},
+        "Steel Drums": {"program": 114},
+        "Woodblock": {"program": 115},
+        "Taiko Drum": {"program": 116},
+        "Melodic Tom": {"program": 117},
+        "Synth Drum": {"program": 118},
+        "Reverse Cymbal": {"program": 119},
+        # Sound Effects
+        "Guitar Fret Noise": {"program": 120},
+        "Breath Noise": {"program": 121},
+        "Seashore": {"program": 122},
+        "Bird Tweet": {"program": 123},
+        "Telephone Ring": {"program": 124},
+        "Helicopter": {"program": 125},
+        "Applause": {"program": 126},
+        "Gunshot": {"program": 127},
     }
 
     def __init__(self, sample_rate=SAMPLE_RATE):
         self.sample_rate = sample_rate
-        self.current_preset = "Grand Piano"
+        self.current_preset = "Acoustic Grand Piano"
         self.volume = 0.8
         self.stream = None
         self.last_audio_buffer = np.zeros(BLOCK_SIZE, dtype=np.float32)

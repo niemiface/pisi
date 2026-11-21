@@ -13,3 +13,4 @@ evdev>=1.6.0
 pygame>=2.5.0
 sf2utils>=1.0.0
 audioop-lts>=0.2.2; python_version >= "3.13"
+pyfluidsynth>=1.3.0
